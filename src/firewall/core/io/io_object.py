@@ -247,18 +247,28 @@ class IO_Object_ContentHandler(sax.handler.ContentHandler):
     def __init__(self, item):
         self.item = item
         self._element = ""
+        self._comments = []
 
     def startDocument(self):
         self._element = ""
+        self._comments = []
+
+    def comment(self, data):
+        if data != "":
+            self._comments.append(data)
 
     def startElement(self, name, attrs):
         self._element = ""
+        self._precedingComments = self._comments
+        self._comments = []
 
     def endElement(self, name):
         if name == "short":
             self.item.short = self._element
         elif name == "description":
             self.item.description = self._element
+        self._trailingComments = self._comments
+        self._comments = []
 
     def characters(self, content):
         self._element += content.replace("\n", " ")

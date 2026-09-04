@@ -48,8 +48,9 @@ class IPSet(IO_Object):
         "type": "",  # s
         "options": {"": ""},  # a{ss}
         "entries": [""],  # as
+        "comments": {("", ""): ([""], [""])},  # a{(ss)(asas)}
     }
-    DBUS_SIGNATURE = "(ssssa{ss}as)"
+    DBUS_SIGNATURE = "(ssssa{ss}asa{(ss)(asas)})"
     ADDITIONAL_ALNUM_CHARS = ["_", "-", ":", "."]
     PARSER_REQUIRED_ELEMENT_ATTRS = {
         "short": None,
@@ -70,6 +71,7 @@ class IPSet(IO_Object):
         self.description = ""
         self.type = ""
         self.entries = []
+        self.comments = {}
         self.options = {}
         self.applied = False
 
@@ -79,6 +81,7 @@ class IPSet(IO_Object):
         self.description = ""
         self.type = ""
         del self.entries[:]
+        self.comments.clear()
         self.options.clear()
         self.applied = False
 
@@ -366,10 +369,14 @@ class ipset_ContentHandler(IO_Object_ContentHandler):
                 self.item.type = attrs["type"]
             if "version" in attrs:
                 self.item.version = attrs["version"]
+            if self._precedingComments:
+                self.item.comments[("ipset", "")] = (self._precedingComments, [])
         elif name == "short":
-            pass
+            if self._precedingComments:
+                self.item.comments[("short", "")] = (self._precedingComments, [])
         elif name == "description":
-            pass
+            if self._precedingComments:
+                self.item.comments[("description", "")] = (self._precedingComments, [])
         elif name == "option":
             value = ""
             if "value" in attrs:
@@ -411,6 +418,8 @@ class ipset_ContentHandler(IO_Object_ContentHandler):
                 raise FirewallError(errors.INVALID_FAMILY, value)
             if attrs["name"] not in self.item.options:
                 self.item.options[attrs["name"]] = value
+                if self._precedingComments:
+                    self.item.comments[("option", attrs["name"])] = (self._precedingComments, [])
             else:
                 log.warning("Option %s already set, ignoring.", attrs["name"])
         # nothing to do for entry and entries here
@@ -419,6 +428,12 @@ class ipset_ContentHandler(IO_Object_ContentHandler):
         IO_Object_ContentHandler.endElement(self, name)
         if name == "entry":
             self.item.entries.append(self._element)
+            if self._precedingComments or self._trailingComments:
+                self.item.comments = self.item.comments | {("entry", self._element): (self._precedingComments, self._trailingComments)}
+        if name == "ipset":
+            if self._trailingComments:
+                self.item.comments = self.item.comments | {("ipset", ""): ([], [])}
+                self.item.comments[("ipset", "")] = (self.item.comments[("ipset", "")][0], self._trailingComments)
 
 
 def ipset_reader(filename, path):
@@ -478,6 +493,14 @@ def ipset_reader(filename, path):
     return ipset
 
 
+def write_comments(handler, indent, newline, comments, ptidx, key, value=""):
+    if (key, value) in comments:
+        for comment in comments[(key, value)][ptidx]:
+            handler.ignorableWhitespace(indent)
+            handler.comment(comment)
+            handler.ignorableWhitespace(newline)
+
+
 def ipset_writer(ipset, path=None):
     _path = path if path else ipset.path
 
@@ -506,11 +529,13 @@ def ipset_writer(ipset, path=None):
     attrs = {"type": ipset.type}
     if ipset.version and ipset.version != "":
         attrs["version"] = ipset.version
+    write_comments(handler, "", "", ipset.comments, 0, "ipset")
     handler.startElement("ipset", attrs)
     handler.ignorableWhitespace("\n")
 
     # short
     if ipset.short and ipset.short != "":
+        write_comments(handler, "  ", "\n", ipset.comments, 0, "short")
         handler.ignorableWhitespace("  ")
         handler.startElement("short", {})
         handler.characters(ipset.short)
@@ -519,6 +544,7 @@ def ipset_writer(ipset, path=None):
 
     # description
     if ipset.description and ipset.description != "":
+        write_comments(handler, "  ", "\n", ipset.comments, 0, "description")
         handler.ignorableWhitespace("  ")
         handler.startElement("description", {})
         handler.characters(ipset.description)
@@ -527,6 +553,7 @@ def ipset_writer(ipset, path=None):
 
     # options
     for key, value in ipset.options.items():
+        write_comments(handler, "  ", "\n", ipset.comments, 0, "option", key)
         handler.ignorableWhitespace("  ")
         if value != "":
             handler.simpleElement("option", {"name": key, "value": value})
@@ -536,13 +563,16 @@ def ipset_writer(ipset, path=None):
 
     # entries
     for entry in ipset.entries:
+        write_comments(handler, "  ", "\n", ipset.comments, 0, "entry", entry)
         handler.ignorableWhitespace("  ")
         handler.startElement("entry", {})
         handler.characters(entry)
+        write_comments(handler, "", "", ipset.comments, 1, "entry", entry)
         handler.endElement("entry")
         handler.ignorableWhitespace("\n")
 
     # end ipset element
+    write_comments(handler, "  ", "\n", ipset.comments, 1, "ipset")
     handler.endElement("ipset")
     handler.ignorableWhitespace("\n")
     handler.endDocument()
