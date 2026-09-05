@@ -578,4 +578,3 @@ def ipset_writer(ipset, path=None):
     handler.endDocument()
     f.close()
     del handler
-
