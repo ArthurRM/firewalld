@@ -428,11 +428,11 @@ class ipset_ContentHandler(IO_Object_ContentHandler):
         IO_Object_ContentHandler.endElement(self, name)
         if name == "entry":
             self.item.entries.append(self._element)
-            if self._precedingComments or self._trailingComments:
-                keep_comments(self.item.comments, "entry", self._element, self._precedingComments, self._trailingComments)
+            if self._precedingComments or self._closingComments:
+                keep_comments(self.item.comments, "entry", self._element, self._precedingComments, self._closingComments)
         elif name == "ipset" or name == "short" or name == "description":
-            if self._trailingComments:
-                keep_comments(self.item.comments, name, "", [], self._trailingComments)
+            if self._closingComments:
+                keep_comments(self.item.comments, name, "", [], self._closingComments)
 
 
 def ipset_reader(filename, path):
@@ -496,15 +496,15 @@ def comment_key(elname, elid=""):
     return "%s%s%s" % (elname, "/" if elid != "" else "", elid)
 
 
-def keep_comments(comments, elname, elid, precedingComments, trailingComments=[]):
+def keep_comments(comments, elname, elid, precedingComments, closingComments=[]):
     cmtkey = comment_key(elname, elid)
     if cmtkey not in comments:
-        comments[cmtkey] = (precedingComments, trailingComments)
+        comments[cmtkey] = (precedingComments, closingComments)
     else:
         if not comments[cmtkey][0] and precedingComments:
             comments[cmtkey][0] = precedingComments
-        if not comments[cmtkey][1] and trailingComments:
-            comments[cmtkey][1] = trailingComments
+        if not comments[cmtkey][1] and closingComments:
+            comments[cmtkey][1] = closingComments
 
 
 def write_comments(handler, indent, newline, comments, ptidx, elname, elid=""):
@@ -554,6 +554,7 @@ def ipset_writer(ipset, path=None):
         handler.ignorableWhitespace("  ")
         handler.startElement("short", {})
         handler.characters(ipset.short)
+        write_comments(handler, "", "", ipset.comments, 1, "short")
         handler.endElement("short")
         handler.ignorableWhitespace("\n")
 
@@ -563,6 +564,7 @@ def ipset_writer(ipset, path=None):
         handler.ignorableWhitespace("  ")
         handler.startElement("description", {})
         handler.characters(ipset.description)
+        write_comments(handler, "", "", ipset.comments, 1, "description")
         handler.endElement("description")
         handler.ignorableWhitespace("\n")
 

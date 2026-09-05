@@ -267,7 +267,7 @@ class IO_Object_ContentHandler(sax.handler.ContentHandler):
             self.item.short = self._element
         elif name == "description":
             self.item.description = self._element
-        self._trailingComments = self._comments
+        self._closingComments = self._comments
         self._comments = []
 
     def characters(self, content):
