@@ -48,9 +48,9 @@ class IPSet(IO_Object):
         "type": "",  # s
         "options": {"": ""},  # a{ss}
         "entries": [""],  # as
-        "comments": {("", ""): ([""], [""])},  # a{(ss)(asas)}
+        "comments": {"": ([""], [""])},  # a{s(asas)}
     }
-    DBUS_SIGNATURE = "(ssssa{ss}asa{(ss)(asas)})"
+    DBUS_SIGNATURE = "(ssssa{ss}asa{s(asas)})"
     ADDITIONAL_ALNUM_CHARS = ["_", "-", ":", "."]
     PARSER_REQUIRED_ELEMENT_ATTRS = {
         "short": None,
@@ -370,13 +370,13 @@ class ipset_ContentHandler(IO_Object_ContentHandler):
             if "version" in attrs:
                 self.item.version = attrs["version"]
             if self._precedingComments:
-                self.item.comments[("ipset", "")] = (self._precedingComments, [])
+                keep_comments(self.item.comments, name, "", self._precedingComments)
         elif name == "short":
             if self._precedingComments:
-                self.item.comments[("short", "")] = (self._precedingComments, [])
+                keep_comments(self.item.comments, name, "", self._precedingComments)
         elif name == "description":
             if self._precedingComments:
-                self.item.comments[("description", "")] = (self._precedingComments, [])
+                keep_comments(self.item.comments, name, "", self._precedingComments)
         elif name == "option":
             value = ""
             if "value" in attrs:
@@ -419,7 +419,7 @@ class ipset_ContentHandler(IO_Object_ContentHandler):
             if attrs["name"] not in self.item.options:
                 self.item.options[attrs["name"]] = value
                 if self._precedingComments:
-                    self.item.comments[("option", attrs["name"])] = (self._precedingComments, [])
+                    keep_comments(self.item.comments, "option", attrs["name"], self._precedingComments)
             else:
                 log.warning("Option %s already set, ignoring.", attrs["name"])
         # nothing to do for entry and entries here
@@ -429,11 +429,10 @@ class ipset_ContentHandler(IO_Object_ContentHandler):
         if name == "entry":
             self.item.entries.append(self._element)
             if self._precedingComments or self._trailingComments:
-                self.item.comments = self.item.comments | {("entry", self._element): (self._precedingComments, self._trailingComments)}
-        if name == "ipset":
+                keep_comments(self.item.comments, "entry", self._element, self._precedingComments, self._trailingComments)
+        elif name == "ipset" or name == "short" or name == "description":
             if self._trailingComments:
-                self.item.comments = self.item.comments | {("ipset", ""): ([], [])}
-                self.item.comments[("ipset", "")] = (self.item.comments[("ipset", "")][0], self._trailingComments)
+                keep_comments(self.item.comments, name, "", [], self._trailingComments)
 
 
 def ipset_reader(filename, path):
@@ -493,9 +492,25 @@ def ipset_reader(filename, path):
     return ipset
 
 
-def write_comments(handler, indent, newline, comments, ptidx, key, value=""):
-    if (key, value) in comments:
-        for comment in comments[(key, value)][ptidx]:
+def comment_key(elname, elid=""):
+    return "%s%s%s" % (elname, "/" if elid != "" else "", elid)
+
+
+def keep_comments(comments, elname, elid, precedingComments, trailingComments=[]):
+    cmtkey = comment_key(elname, elid)
+    if cmtkey not in comments:
+        comments[cmtkey] = (precedingComments, trailingComments)
+    else:
+        if not comments[cmtkey][0] and precedingComments:
+            comments[cmtkey][0] = precedingComments
+        if not comments[cmtkey][1] and trailingComments:
+            comments[cmtkey][1] = trailingComments
+
+
+def write_comments(handler, indent, newline, comments, ptidx, elname, elid=""):
+    cmtkey = comment_key(elname, elid)
+    if cmtkey in comments:
+        for comment in comments[cmtkey][ptidx]:
             handler.ignorableWhitespace(indent)
             handler.comment(comment)
             handler.ignorableWhitespace(newline)
