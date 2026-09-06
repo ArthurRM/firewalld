@@ -1526,7 +1526,7 @@ For interfaces that are not under control of NetworkManager, firewalld tries to 
          </listitem>
 	</varlistentry>
 	<varlistentry>
-         <term><optional><option>--permanent</option></optional> <option>--ipset</option>=<replaceable>ipset</replaceable> <option>--add-entry</option>=<replaceable>entry</replaceable></term>
+         <term><optional><option>--permanent</option></optional> <option>--ipset</option>=<replaceable>ipset</replaceable> <option>--add-entry</option>=<replaceable>entry</replaceable> <option>--with-comment</option>=<replaceable>comment</replaceable></term>
          <listitem>
            <para>
              Add a new entry to the ipset.
@@ -1534,6 +1534,9 @@ For interfaces that are not under control of NetworkManager, firewalld tries to 
            <para>
              Adding an entry to an ipset with option <literal>timeout</literal>
              is permitted, but these entries are not tracked by firewalld.
+           </para>
+           <para>
+             Only a single comment can be provided even when adding multiple entries. The comment will be applied to all entries added.
            </para>
          </listitem>
        </varlistentry>
