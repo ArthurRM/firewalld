@@ -25,6 +25,7 @@ from firewall.functions import (
 )
 from firewall.core.io.io_object import (
     IO_Object,
+    IO_Object_CommentsDict,
     IO_Object_ContentHandler,
     IO_Object_XMLGenerator,
 )
@@ -71,7 +72,7 @@ class IPSet(IO_Object):
         self.description = ""
         self.type = ""
         self.entries = []
-        self.comments = {}
+        self.comments = IO_Object_CommentsDict()
         self.options = {}
         self.applied = False
 
@@ -370,13 +371,13 @@ class ipset_ContentHandler(IO_Object_ContentHandler):
             if "version" in attrs:
                 self.item.version = attrs["version"]
             if self._precedingComments:
-                keep_comments(self.item.comments, name, "", self._precedingComments)
+                self.item.comments.set_preceding_comments(name, "", self._precedingComments)
         elif name == "short":
             if self._precedingComments:
-                keep_comments(self.item.comments, name, "", self._precedingComments)
+                self.item.comments.set_preceding_comments(name, "", self._precedingComments)
         elif name == "description":
             if self._precedingComments:
-                keep_comments(self.item.comments, name, "", self._precedingComments)
+                self.item.comments.set_preceding_comments(name, "", self._precedingComments)
         elif name == "option":
             value = ""
             if "value" in attrs:
@@ -419,7 +420,7 @@ class ipset_ContentHandler(IO_Object_ContentHandler):
             if attrs["name"] not in self.item.options:
                 self.item.options[attrs["name"]] = value
                 if self._precedingComments:
-                    keep_comments(self.item.comments, "option", attrs["name"], self._precedingComments)
+                    self.item.comments.set_preceding_comments("option", attrs["name"], self._precedingComments)
             else:
                 log.warning("Option %s already set, ignoring.", attrs["name"])
         # nothing to do for entry and entries here
@@ -429,10 +430,10 @@ class ipset_ContentHandler(IO_Object_ContentHandler):
         if name == "entry":
             self.item.entries.append(self._element)
             if self._precedingComments or self._closingComments:
-                keep_comments(self.item.comments, "entry", self._element, self._precedingComments, self._closingComments)
+                self.item.comments.set_comments("entry", self._element, self._precedingComments, self._closingComments)
         elif name == "ipset" or name == "short" or name == "description":
             if self._closingComments:
-                keep_comments(self.item.comments, name, "", [], self._closingComments)
+                self.item.comments.set_closing_comments(name, "", self._closingComments)
 
 
 def ipset_reader(filename, path):
@@ -493,30 +494,6 @@ def ipset_reader(filename, path):
     return ipset
 
 
-def comment_key(elname, elid=""):
-    return "%s%s%s" % (elname, "/" if elid != "" else "", elid)
-
-
-def keep_comments(comments, elname, elid, precedingComments, closingComments=[]):
-    cmtkey = comment_key(elname, elid)
-    if cmtkey not in comments:
-        comments[cmtkey] = (precedingComments, closingComments)
-    else:
-        if not comments[cmtkey][0] and precedingComments:
-            comments[cmtkey][0] = precedingComments
-        if not comments[cmtkey][1] and closingComments:
-            comments[cmtkey][1] = closingComments
-
-
-def write_comments(handler, indent, newline, comments, cmtpos, elname, elid=""):
-    cmtkey = comment_key(elname, elid)
-    if cmtkey in comments:
-        for comment in comments[cmtkey][cmtpos]:
-            handler.ignorableWhitespace(indent)
-            handler.comment(comment)
-            handler.ignorableWhitespace(newline)
-
-
 def ipset_writer(ipset, path=None):
     _path = path if path else ipset.path
 
@@ -545,33 +522,33 @@ def ipset_writer(ipset, path=None):
     attrs = {"type": ipset.type}
     if ipset.version and ipset.version != "":
         attrs["version"] = ipset.version
-    write_comments(handler, "", "", ipset.comments, 0, "ipset")
+    handler.writeComments("", "", ipset.comments, 0, "ipset")
     handler.startElement("ipset", attrs)
     handler.ignorableWhitespace("\n")
 
     # short
     if ipset.short and ipset.short != "":
-        write_comments(handler, "  ", "\n", ipset.comments, 0, "short")
+        handler.writeComments("  ", "\n", ipset.comments, 0, "short")
         handler.ignorableWhitespace("  ")
         handler.startElement("short", {})
         handler.characters(ipset.short)
-        write_comments(handler, "", "", ipset.comments, 1, "short")
+        handler.writeComments("", "", ipset.comments, 1, "short")
         handler.endElement("short")
         handler.ignorableWhitespace("\n")
 
     # description
     if ipset.description and ipset.description != "":
-        write_comments(handler, "  ", "\n", ipset.comments, 0, "description")
+        handler.writeComments("  ", "\n", ipset.comments, 0, "description")
         handler.ignorableWhitespace("  ")
         handler.startElement("description", {})
         handler.characters(ipset.description)
-        write_comments(handler, "", "", ipset.comments, 1, "description")
+        handler.writeComments("", "", ipset.comments, 1, "description")
         handler.endElement("description")
         handler.ignorableWhitespace("\n")
 
     # options
     for key, value in ipset.options.items():
-        write_comments(handler, "  ", "\n", ipset.comments, 0, "option", key)
+        handler.writeComments("  ", "\n", ipset.comments, 0, "option", key)
         handler.ignorableWhitespace("  ")
         if value != "":
             handler.simpleElement("option", {"name": key, "value": value})
@@ -581,16 +558,16 @@ def ipset_writer(ipset, path=None):
 
     # entries
     for entry in ipset.entries:
-        write_comments(handler, "  ", "\n", ipset.comments, 0, "entry", entry)
+        handler.writeComments("  ", "\n", ipset.comments, 0, "entry", entry)
         handler.ignorableWhitespace("  ")
         handler.startElement("entry", {})
         handler.characters(entry)
-        write_comments(handler, "", "", ipset.comments, 1, "entry", entry)
+        handler.writeComments("", "", ipset.comments, 1, "entry", entry)
         handler.endElement("entry")
         handler.ignorableWhitespace("\n")
 
     # end ipset element
-    write_comments(handler, "  ", "\n", ipset.comments, 1, "ipset")
+    handler.writeComments("  ", "\n", ipset.comments, 1, "ipset")
     handler.endElement("ipset")
     handler.ignorableWhitespace("\n")
     handler.endDocument()
