@@ -239,10 +239,10 @@ class IO_Object_CommentsDict(dict):
         elif not self[key][1]:
             self[key][1] = closing_comments
 
-    def get_comments(self, cmt_pos, el_name, el_id=""):
+    def get_comments(self, pos, el_name, el_id=""):
         key = self.__comment_key(el_name, el_id)
-        if key in self and self[key][cmt_pos]:
-            return self[key][cmt_pos]
+        if key in self and self[key][pos]:
+            return self[key][pos]
         return []
 
 
@@ -306,6 +306,10 @@ class IO_Object_ContentHandler(sax.handler.ContentHandler):
 
     def comment(self, data):
         if data != "":
+            if data[0].isspace():
+                data = data[1:]
+            if data[-1].isspace():
+                data = data[:-1]
             self._comments.append(data)
 
     def startDTD(self, name, public_id, system_id):
@@ -347,12 +351,12 @@ class IO_Object_XMLGenerator(saxutils.XMLGenerator):
         self._write("/>")
 
     def comment(self, comment):
-        self._write("<!--" + comment + "-->")
+        self._write("<!-- " + comment + " -->")
 
     def writeComments(self, indent, newline, comments_dict, cmt_pos, el_name, el_inst=""):
         for comment in comments_dict.get_comments(cmt_pos, el_name, el_inst):
             self.ignorableWhitespace(indent)
-            self.comment(" " + comment.strip() + " ")
+            self.comment(comment)
             self.ignorableWhitespace(newline)
 
 
