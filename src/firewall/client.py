@@ -24,6 +24,7 @@ from firewall.core.ipset import (
     check_entry_overlaps_existing,
     check_for_overlapping_entries,
 )
+from firewall.core.io.io_object import IO_Object_CommentsDict
 from firewall import errors
 from firewall.errors import FirewallError
 import firewall.functions
@@ -1739,8 +1740,9 @@ class FirewallClientIPSetSettings:
     def __init__(self, settings=None):
         if settings:
             self.settings = settings
+            self.settings[6] = IO_Object_CommentsDict(self.settings[6])
         else:
-            self.settings = ["", "", "", "", {}, [], {}]
+            self.settings = ["", "", "", "", {}, [], IO_Object_CommentsDict()]
 
     @handle_exceptions
     def __repr__(self):
@@ -1821,10 +1823,17 @@ class FirewallClientIPSetSettings:
     def addEntry(self, entry):
         if "timeout" in self.settings[4] and self.settings[4]["timeout"] != "0":
             raise FirewallError(errors.IPSET_WITH_TIMEOUT)
+        comment = None
+        if isinstance(entry, dict):
+            if "comment" in entry:
+                comment = entry["comment"]
+            entry = entry["entry"]
         entry = normalize_ipset_entry(entry)
         if entry not in self.settings[5]:
             check_entry_overlaps_existing(entry, self.settings[5])
             self.settings[5].append(entry)
+            if comment:
+                self.settings[6].set_preceding_comments("entry", entry, [comment])
         else:
             raise FirewallError(errors.ALREADY_ENABLED, entry)
 

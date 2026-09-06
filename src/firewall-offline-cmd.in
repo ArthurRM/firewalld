@@ -862,6 +862,7 @@ parser_group_zone_or_policy.add_argument("--set-egress-priority", metavar="<prio
 parser.add_argument("--option", metavar="<key>[=<value>]", action="append")
 parser.add_argument("--type", metavar="<ipsettype>")
 parser.add_argument("--ipset", metavar="<ipset>")
+parser.add_argument("--with-comment", metavar="<comment>")
 
 parser_ipset = parser.add_mutually_exclusive_group()
 # parser_ipset.add_argument("--add-option", metavar="<key>[=<value>]")
@@ -2246,8 +2247,11 @@ try:
             settings = FirewallClientIPSetSettings(
                 list(fw.config.get_ipset_config(ipset))
             )
+            entry = a.add_entry
+            if a.with_comment:
+                entry = list(map(lambda e: {"entry": e, "comment": a.with_comment}, entry))
             cmd.add_sequence(
-                a.add_entry, settings.addEntry, settings.queryEntry, None, "'%s'"
+                entry, settings.addEntry, settings.queryEntry, None, "'%s'"
             )
             fw.config.set_ipset_config(ipset, settings.settings)
 
