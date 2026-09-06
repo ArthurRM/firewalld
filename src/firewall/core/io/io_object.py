@@ -253,10 +253,6 @@ class IO_Object_ContentHandler(sax.handler.ContentHandler):
         self._element = ""
         self._comments = []
 
-    def comment(self, data):
-        if data != "":
-            self._comments.append(data)
-
     def startElement(self, name, attrs):
         self._element = ""
         self._precedingComments = self._comments
@@ -272,6 +268,22 @@ class IO_Object_ContentHandler(sax.handler.ContentHandler):
 
     def characters(self, content):
         self._element += content.replace("\n", " ")
+
+    def comment(self, data):
+        if data != "":
+            self._comments.append(data)
+
+    def startDTD(self, name, public_id, system_id):
+        pass
+
+    def endDTD(self):
+        pass
+
+    def startCDATA(self):
+        pass
+
+    def endCDATA(self):
+        pass
 
 
 class IO_Object_XMLGenerator(saxutils.XMLGenerator):
@@ -298,6 +310,9 @@ class IO_Object_XMLGenerator(saxutils.XMLGenerator):
         for name, value in attrs.items():
             self._write(" %s=%s" % (name, saxutils.quoteattr(value)))
         self._write("/>")
+
+    def comment(self, comment):
+        self._write("<!--" + comment + "-->")
 
 
 def check_port(port):

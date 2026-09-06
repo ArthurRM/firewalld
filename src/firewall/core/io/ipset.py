@@ -450,6 +450,7 @@ def ipset_reader(filename, path):
     handler = ipset_ContentHandler(ipset)
     parser = sax.make_parser()
     parser.setContentHandler(handler)
+    parser.setProperty("http://xml.org/sax/properties/lexical-handler", handler)
     name = "%s/%s" % (path, filename)
     with open(name, "rb") as f:
         source = sax.InputSource(None)
