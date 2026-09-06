@@ -508,10 +508,10 @@ def keep_comments(comments, elname, elid, precedingComments, closingComments=[])
             comments[cmtkey][1] = closingComments
 
 
-def write_comments(handler, indent, newline, comments, ptidx, elname, elid=""):
+def write_comments(handler, indent, newline, comments, cmtpos, elname, elid=""):
     cmtkey = comment_key(elname, elid)
     if cmtkey in comments:
-        for comment in comments[cmtkey][ptidx]:
+        for comment in comments[cmtkey][cmtpos]:
             handler.ignorableWhitespace(indent)
             handler.comment(comment)
             handler.ignorableWhitespace(newline)
